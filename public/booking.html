@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Termin buchen</title>
+  <link rel="stylesheet" href="/public/booking.css">
+</head>
+<body>
+  <div class="booking-container">
+    <div class="booking-header">
+      <div class="booking-icon">&#9986;</div>
+      <h1 id="shop-name">Friseursalon</h1>
+      <p id="shop-address"></p>
+    </div>
+
+    <div id="step-1" class="booking-step active">
+      <h2>1. Dienstleistung wählen</h2>
+      <div id="services-list" class="services-grid"></div>
+    </div>
+
+    <div id="step-2" class="booking-step">
+      <div class="back-row">
+        <button class="back-btn" onclick="showStep(1)">&larr;</button>
+        <h2>2. Datum wählen</h2>
+      </div>
+      <div class="cal-wrap">
+        <div class="cal-nav-row">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">&larr;</button>
+          <span id="cal-month-label"></span>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">&rarr;</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <div id="tp-area" style="display:none">
+        <div class="tp-box">
+          <div class="tp-row">
+            <div class="tp-col" id="tp-hours"></div>
+            <span class="tp-sep">:</span>
+            <div class="tp-col" id="tp-mins"></div>
+            <span class="tp-suffix">Uhr</span>
+          </div>
+        </div>
+        <button class="btn-book" onclick="confirmTime()">Weiter</button>
+      </div>
+    </div>
+
+    <div id="step-3" class="booking-step">
+      <div class="back-row">
+        <button class="back-btn" onclick="showStep(2)">&larr;</button>
+        <h2>3. Ihre Angaben</h2>
+      </div>
+      <div class="booking-summary" id="booking-summary"></div>
+      <div class="payment-notice">
+        <div class="payment-icon">&#128176;</div>
+        <div class="payment-text">Zahlung nur in Bar vor Ort</div>
+      </div>
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" id="customer-name" placeholder="Vor- und Nachname" required>
+      </div>
+      <div class="form-group">
+        <label>E-Mail *</label>
+        <input type="email" id="customer-email" placeholder="email@beispiel.de" required>
+      </div>
+      <div class="form-group">
+        <label>Telefon</label>
+        <input type="tel" id="customer-phone" placeholder="+49 123 456789">
+      </div>
+      <div class="form-group">
+        <label>Notizen</label>
+        <textarea id="customer-notes" rows="2" placeholder="Wünsche oder Anmerkungen..."></textarea>
+      </div>
+      <button class="btn-book" onclick="submitBooking()">Termin verbindlich buchen</button>
+    </div>
+
+    <div id="step-success" class="booking-step">
+      <div class="success-icon">&#10003;</div>
+      <h2>Buchung erfolgreich!</h2>
+      <p>Sie erhalten in Kürze eine Bestätigungs-E-Mail.</p>
+      <div id="success-details" class="success-details"></div>
+      <div class="payment-notice" style="margin-top:16px">
+        <div class="payment-icon">&#128176;</div>
+        <div class="payment-text">Zahlung nur in Bar vor Ort</div>
+      </div>
+      <button class="btn-book" onclick="resetBooking()">Neue Buchung</button>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+  <script>
+    const API = '/api';
+    let selectedService = null;
+    let selectedDate = null;
+    let selectedTime = null;
+    let calMonth, calYear;
+    let availableSlots = [];
+
+    function toast(msg, type = 'error') {
+      const container = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = 'toast toast-' + type;
+      t.textContent = msg;
+      container.appendChild(t);
+      setTimeout(() => t.remove(), 4000);
+    }
+
+    function showStep(n) {
+      document.querySelectorAll('.booking-step').forEach(s => s.classList.remove('active'));
+      document.getElementById('step-' + n).classList.add('active');
+    }
+
+    function formatDateLong(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00');
+      return d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    }
+
+    /* ---- Calendar ---- */
+    function initCalendar() {
+      const now = new Date();
+      calMonth = now.getMonth();
+      calYear = now.getFullYear();
+      renderCalendar();
+    }
+
+    function changeMonth(delta) {
+      calMonth += delta;
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      selectedDate = null;
+      selectedTime = null;
+      document.getElementById('tp-area').style.display = 'none';
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const firstDay = new Date(calYear, calMonth, 1);
+      const lastDay = new Date(calYear, calMonth + 1, 0);
+      const startDow = firstDay.getDay();
+      const startOffset = startDow === 0 ? 6 : startDow - 1;
+
+      document.getElementById('cal-month-label').textContent =
+        firstDay.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+
+      const grid = document.getElementById('cal-grid');
+      let html = '<div class="cal-row cal-head">' +
+        ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(d =>
+          `<div class="cal-cell cal-hdr">${d}</div>`
+        ).join('') + '</div>';
+
+      let dayNum = 1;
+      for (let r = 0; r < 6; r++) {
+        html += '<div class="cal-row">';
+        for (let c = 0; c < 7; c++) {
+          if ((r === 0 && c < startOffset) || dayNum > lastDay.getDate()) {
+            html += '<div class="cal-cell cal-empty"></div>';
+          } else {
+            const ds = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(dayNum).padStart(2, '0');
+            const d = new Date(calYear, calMonth, dayNum);
+            const isPast = d < today;
+            const isSel = ds === selectedDate;
+            html += `<div class="cal-cell cal-day${isPast ? ' cal-past' : ''}${isSel ? ' cal-sel' : ''}" data-date="${ds}" onclick="pickDate('${ds}')">${dayNum}</div>`;
+            dayNum++;
+          }
+        }
+        html += '</div>';
+      }
+      grid.innerHTML = html;
+    }
+
+    async function pickDate(dateStr) {
+      selectedDate = dateStr;
+      selectedTime = null;
+      document.querySelectorAll('.cal-day').forEach(d => d.classList.remove('cal-sel'));
+      document.querySelector(`.cal-day[data-date="${dateStr}"]`).classList.add('cal-sel');
+      document.getElementById('tp-area').style.display = 'none';
+      await loadTimePicker(dateStr);
+    }
+
+    async function loadTimePicker(dateStr) {
+      const area = document.getElementById('tp-area');
+      try {
+        const res = await fetch(API + '/available-slots?date=' + dateStr);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const slots = await res.json();
+        availableSlots = slots || [];
+
+        if (availableSlots.length === 0) {
+          document.getElementById('tp-hours').innerHTML = '';
+          document.getElementById('tp-mins').innerHTML = '';
+          area.innerHTML = '<p style="color:#8e94a7;text-align:center;padding:12px 0">Keine Termine verfügbar</p>';
+          area.style.display = 'block';
+          return;
+        }
+
+        const hours = [...new Set(availableSlots.map(s => s.time.split(':')[0]))].sort();
+
+        buildPicker(hours);
+        area.style.display = 'block';
+      } catch (e) {
+        console.error('loadTimePicker error:', e);
+        document.getElementById('tp-hours').innerHTML = '';
+        document.getElementById('tp-mins').innerHTML = '';
+        area.innerHTML = '<p style="color:red">Fehler beim Laden</p>';
+        area.style.display = 'block';
+      }
+    }
+
+    /* ---- Wheel picker ---- */
+    let _slotMap = {}; // hour → [minutes]
+
+    function buildPicker(hours) {
+      _slotMap = {};
+      availableSlots.forEach(s => {
+        const [h, m] = s.time.split(':');
+        if (!_slotMap[h]) _slotMap[h] = [];
+        if (!_slotMap[h].includes(m)) _slotMap[h].push(m);
+      });
+
+      const hCol = document.getElementById('tp-hours');
+      const mCol = document.getElementById('tp-mins');
+
+      const spacer = '<div class="tp-item tp-spacer"></div>';
+      hCol.innerHTML = spacer + hours.map(h =>
+        `<div class="tp-item" data-val="${h}">${h}</div>`
+      ).join('') + spacer;
+
+      rebuildMins(mCol, hours[0]);
+      const scrollCenter = (col) => {
+        const items = col.querySelectorAll('.tp-item:not(.tp-spacer)');
+        if (items.length) {
+          const mid = Math.floor(items.length / 2);
+          items[mid].scrollIntoView({ block: 'center', behavior: 'auto' });
+        }
+      };
+
+      requestAnimationFrame(() => {
+        scrollCenter(hCol);
+        setTimeout(() => {
+          const curH = pickerValue(hCol);
+          if (curH) rebuildMins(mCol, curH);
+          scrollCenter(mCol);
+          setTimeout(tickPicker, 100);
+        }, 50);
+      });
+
+      hCol.onscroll = function() {
+        const curH = pickerValue(hCol);
+        if (curH) rebuildMins(mCol, curH);
+        tickPicker();
+      };
+      mCol.onscroll = tickPicker;
+    }
+
+    function rebuildMins(mCol, hour) {
+      const mins = (_slotMap[hour] || []).sort();
+      const spacer = '<div class="tp-item tp-spacer"></div>';
+      mCol.innerHTML = spacer + mins.map(m =>
+        `<div class="tp-item" data-val="${m}">${m}</div>`
+      ).join('') + spacer;
+      requestAnimationFrame(() => {
+        const items = mCol.querySelectorAll('.tp-item:not(.tp-spacer)');
+        if (items.length) {
+          const mid = Math.floor(items.length / 2);
+          items[mid].scrollIntoView({ block: 'center', behavior: 'auto' });
+        }
+      });
+    }
+
+    function tickPicker() {
+      const h = pickerValue(document.getElementById('tp-hours'));
+      const m = pickerValue(document.getElementById('tp-mins'));
+      if (h && m) {
+        const t = h + ':' + m;
+        const ok = availableSlots.some(s => s.time === t);
+        if (ok) {
+          selectedTime = t;
+        } else {
+          selectedTime = null;
+        }
+      }
+    }
+
+    function pickerValue(col) {
+      const items = col.querySelectorAll('.tp-item:not(.tp-spacer)');
+      const center = col.scrollTop + col.clientHeight / 2;
+      let closest = null, dist = Infinity;
+      items.forEach(item => {
+        const ic = item.offsetTop + item.offsetHeight / 2;
+        const d = Math.abs(ic - center);
+        if (d < dist) { dist = d; closest = item; }
+      });
+      items.forEach(item => item.classList.toggle('active', item === closest));
+      return closest ? closest.dataset.val : null;
+    }
+
+    function confirmTime() {
+      if (!selectedTime) {
+        toast('Bitte wählen Sie eine verfügbare Uhrzeit');
+        return;
+      }
+      updateSummary();
+      showStep(3);
+    }
+
+    function updateSummary() {
+      document.getElementById('booking-summary').innerHTML = `
+        <div class="summary-row"><span>Dienstleistung:</span><span>${selectedService.name}</span></div>
+        <div class="summary-row"><span>Datum:</span><span>${formatDateLong(selectedDate)}</span></div>
+        <div class="summary-row"><span>Zeit:</span><span>${selectedTime} Uhr</span></div>
+        <div class="summary-row"><span>Dauer:</span><span>${selectedService.duration} Minuten</span></div>
+        ${selectedService.price ? '<div class="summary-row"><span>Preis:</span><span>' + selectedService.price.toFixed(2).replace('.', ',') + ' €</span></div>' : ''}
+      `;
+    }
+
+    async function init() {
+      try {
+        const status = await fetch(API + '/status').then(r => r.json());
+        document.getElementById('shop-name').textContent = status.shopName || 'Friseursalon';
+        const settings = await fetch(API + '/public-settings').then(r => r.json());
+        if (settings.shop_address) document.getElementById('shop-address').textContent = settings.shop_address;
+      } catch (e) {
+        console.error('Could not load shop info');
+      }
+      await loadServices();
+      initCalendar();
+    }
+
+    async function loadServices() {
+      try {
+        const services = await fetch(API + '/services').then(r => r.json());
+        const container = document.getElementById('services-list');
+        container.innerHTML = services.map(s => `
+          <div class="service-card" onclick="selectService(${s.id}, '${s.name}', ${s.duration}, ${s.price || 0})">
+            <div class="service-color" style="background:${s.color}"></div>
+            <div class="service-name">${s.name}</div>
+            <div class="service-duration">${s.duration} Minuten</div>
+            ${s.price ? '<div class="service-price">' + s.price.toFixed(2).replace('.', ',') + ' €</div>' : ''}
+          </div>
+        `).join('');
+      } catch (e) {
+        document.getElementById('services-list').innerHTML = '<p style="color:red">Dienstleistungen konnten nicht geladen werden.</p>';
+      }
+    }
+
+    function selectService(id, name, duration, price) {
+      selectedService = { id, name, duration, price };
+      document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+      showStep(2);
+    }
+
+    async function submitBooking() {
+      const name = document.getElementById('customer-name').value.trim();
+      const email = document.getElementById('customer-email').value.trim();
+      const phone = document.getElementById('customer-phone').value.trim();
+      const notes = document.getElementById('customer-notes').value.trim();
+
+      if (!name) return toast('Bitte geben Sie Ihren Namen ein');
+      if (!email) return toast('Bitte geben Sie Ihre E-Mail-Adresse ein');
+      if (!email.includes('@')) return toast('Bitte geben Sie eine gültige E-Mail-Adresse ein');
+
+      const submitBtn = document.querySelector('#step-3 .btn-book');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Wird gebucht...';
+
+      try {
+        const customer = await fetch(API + '/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, phone })
+        }).then(r => r.json());
+
+        const appointment = await fetch(API + '/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: customer.id,
+            service_id: selectedService.id,
+            date: selectedDate,
+            time: selectedTime,
+            duration: selectedService.duration,
+            notes
+          })
+        }).then(r => r.json());
+
+        document.getElementById('success-details').innerHTML = `
+          <div class="summary-row"><span>Kunde:</span><span>${customer.name}</span></div>
+          <div class="summary-row"><span>Service:</span><span>${selectedService.name}</span></div>
+          <div class="summary-row"><span>Datum:</span><span>${formatDateLong(selectedDate)}</span></div>
+          <div class="summary-row"><span>Zeit:</span><span>${selectedTime} Uhr</span></div>
+        `;
+        showStep('success');
+      } catch (e) {
+        toast('Fehler bei der Buchung. Bitte versuchen Sie es später erneut.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Termin verbindlich buchen';
+      }
+    }
+
+    function resetBooking() {
+      selectedService = null;
+      selectedDate = null;
+      selectedTime = null;
+      document.getElementById('customer-name').value = '';
+      document.getElementById('customer-email').value = '';
+      document.getElementById('customer-phone').value = '';
+      document.getElementById('customer-notes').value = '';
+      document.getElementById('tp-area').style.display = 'none';
+      showStep(1);
+      loadServices();
+      initCalendar();
+    }
+
+    init();
+  </script>
+</body>
+</html>

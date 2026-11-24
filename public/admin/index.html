@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Admin - Friseur Terminverwaltung</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Top Bar (mobile) -->
+  <div class="topbar">
+    <span class="topbar-title">&#9986; Friseur</span>
+    <div class="topbar-actions">
+      <button class="topbar-btn" onclick="copyBookingUrl()" title="Buchungs-Link kopieren">&#128203;</button>
+      <button class="topbar-btn" onclick="logout()" title="Abmelden">&#128682;</button>
+    </div>
+  </div>
+
+  <!-- Sidebar (desktop) -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">&#9986;</div>
+      <h1>Friseur</h1>
+    </div>
+    <nav>
+      <button class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+        <span class="nav-icon">&#9632;</span><span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="calendar" onclick="navigate('calendar')">
+        <span class="nav-icon">&#128197;</span><span>Kalender</span>
+      </button>
+      <button class="nav-item" data-page="customers" onclick="navigate('customers')">
+        <span class="nav-icon">&#128101;</span><span>Kunden</span>
+      </button>
+      <button class="nav-item" data-page="appointments" onclick="navigate('appointments')">
+        <span class="nav-icon">&#128220;</span><span>Alle Termine</span>
+      </button>
+      <button class="nav-item" data-page="services" onclick="navigate('services')">
+        <span class="nav-icon">&#128296;</span><span>Services</span>
+      </button>
+      <button class="nav-item" data-page="statistics" onclick="navigate('statistics')">
+        <span class="nav-icon">&#128200;</span><span>Statistiken</span>
+      </button>
+      <button class="nav-item" data-page="settings" onclick="navigate('settings')">
+        <span class="nav-icon">&#9881;</span><span>Einstellungen</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="server-info">Server: <span id="server-status">online</span></div>
+      <button class="copy-btn" onclick="copyBookingUrl()">&#128203; Buchungs-Link kopieren</button>
+      <button class="copy-btn" style="margin-top:6px;background:rgba(246,78,96,0.2);" onclick="logout()">&#128682; Abmelden</button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div id="main-content">
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <h2>Dashboard</h2>
+        <button class="btn btn-primary btn-sm" onclick="openNewAppointment()">+ Neu</button>
+      </div>
+      <div class="week-nav">
+        <button class="btn btn-sm" onclick="changeDashWeek(-1)">&larr;</button>
+        <span class="week-nav-label" id="dash-week-label"></span>
+        <button class="btn btn-sm" onclick="changeDashWeek(1)">&rarr;</button>
+        <button class="btn btn-sm btn-primary" onclick="dashWeekOffset=0;loadDashboard()">Heute</button>
+      </div>
+      <div class="stats-grid" id="dash-stats"></div>
+      <div class="shift-bar">
+        <button class="btn btn-primary" onclick="openShiftModal()">Verschieben</button>
+        <span id="shift-result" class="shift-result"></span>
+      </div>
+      <div class="card">
+        <div class="card-header">Termine der Woche</div>
+        <div class="card-body" id="dash-appointments"></div>
+      </div>
+    </div>
+
+    <div id="page-calendar" class="page">
+      <div class="page-header">
+        <h2>Kalender</h2>
+        <button class="btn btn-primary btn-sm" onclick="openNewAppointment()">+ Neu</button>
+      </div>
+      <div class="cal-nav">
+        <button class="btn btn-sm" onclick="changeMonth(-1)">&larr;</button>
+        <span class="week-label" id="week-label"></span>
+        <button class="btn btn-sm" onclick="changeMonth(1)">&rarr;</button>
+      </div>
+      <div id="calendar-view"></div>
+    </div>
+
+    <div id="page-appointments" class="page">
+      <div class="page-header">
+        <h2>Alle Termine</h2>
+        <button class="btn btn-primary btn-sm" onclick="openNewAppointment()">+ Neu</button>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="appt-search" placeholder="Suchen..." oninput="loadAllAppointments()">
+      </div>
+      <div id="all-appointments-list"></div>
+    </div>
+
+    <div id="page-customers" class="page">
+      <div class="page-header">
+        <h2>Kunden</h2>
+        <button class="btn btn-primary btn-sm" onclick="openNewCustomer()">+ Neu</button>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="customer-search" placeholder="Suchen..." oninput="loadCustomers()">
+      </div>
+      <div id="customer-list"></div>
+    </div>
+
+    <div id="page-services" class="page">
+      <div class="page-header">
+        <h2>Services</h2>
+        <button class="btn btn-primary btn-sm" onclick="openNewService()">+ Neu</button>
+      </div>
+      <div id="service-list"></div>
+    </div>
+
+    <div id="page-statistics" class="page">
+      <div class="page-header">
+        <h2>Statistiken</h2>
+      </div>
+      <div class="month-nav">
+        <button class="btn btn-sm" onclick="changeStatsMonth(-1)">&larr;</button>
+        <span class="month-label" id="stats-month-label"></span>
+        <button class="btn btn-sm" onclick="changeStatsMonth(1)">&rarr;</button>
+      </div>
+      <div class="stats-grid" id="stats-cards"></div>
+      <div class="card">
+        <div class="card-header">Dienstleistungen (Monat)</div>
+        <div class="card-body" id="stats-by-service"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Kunden (Monat)</div>
+        <div class="card-body stats-customer-body" id="stats-customers"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Monatlicher Verdienst</div>
+        <div class="card-body" id="stats-chart-body"></div>
+      </div>
+    </div>
+
+    <div id="page-settings" class="page">
+      <div class="page-header"><h2>Einstellungen</h2></div>
+      <div class="settings-grid">
+        <div class="card">
+          <div class="card-header">Salon</div>
+          <div class="card-body">
+            <label>Name <input type="text" id="set-shop_name" onchange="saveSetting('shop_name', this.value)"></label>
+            <label>Adresse <input type="text" id="set-shop_address" onchange="saveSetting('shop_address', this.value)"></label>
+            <label>Vorlaufzeit (Min.) <input type="number" id="set-booking_lead_time" onchange="saveSetting('booking_lead_time', this.value)"></label>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">E-Mail (Resend)</div>
+          <div class="card-body">
+            <p id="email-provider-status" style="font-size:13px;color:var(--text-muted);margin:0 0 10px"></p>
+            <label>Absender <input type="email" id="set-resend_from_email" onchange="saveSetting('resend_from_email', this.value)" placeholder="onboarding@resend.dev"></label>
+            <p style="font-size:12px;color:var(--text-muted);margin:8px 0 0">Der API-Key wird ausschließlich über <code>RESEND_API_KEY</code> gesetzt und nie an den Browser übertragen.</p>
+            <button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="testEmail()">📧 Test-E-Mail senden</button>
+            <div id="email-test-result" style="font-size:12px;margin-top:6px;min-height:18px"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Öffnungszeiten</div>
+          <div class="card-body" id="working-hours-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">Geschlossen / Feiertage</div>
+          <div class="card-body">
+            <div class="add-blocked-row">
+              <input type="date" id="blocked-date-input">
+              <input type="text" id="blocked-reason-input" placeholder="Grund">
+              <button class="btn btn-sm" onclick="addBlockedDate()">+</button>
+            </div>
+            <div class="blocked-list" id="blocked-dates-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Tabs (mobile) -->
+  <div class="tabs" id="bottom-tabs">
+    <button class="tab active" data-page="dashboard" onclick="navigate('dashboard')">
+      <span class="tab-icon">▦</span><span>Dashboard</span>
+    </button>
+    <button class="tab" data-page="calendar" onclick="navigate('calendar')">
+      <span class="tab-icon">&#128197;</span><span>Kalender</span>
+    </button>
+    <button class="tab" data-page="appointments" onclick="navigate('appointments')">
+      <span class="tab-icon">&#9776;</span><span>Termine</span>
+    </button>
+    <button class="tab" data-page="customers" onclick="navigate('customers')">
+      <span class="tab-icon">&#128101;</span><span>Kunden</span>
+    </button>
+    <button class="tab" data-page="services" onclick="navigate('services')">
+      <span class="tab-icon">&#9986;</span><span>Services</span>
+    </button>
+    <button class="tab" data-page="statistics" onclick="navigate('statistics')">
+      <span class="tab-icon">&#8599;</span><span>Statistik</span>
+    </button>
+    <button class="tab" data-page="settings" onclick="navigate('settings')">
+      <span class="tab-icon">&#8942;</span><span>Einstell.</span>
+    </button>
+  </div>
+
+  <div id="modal-overlay" class="hidden" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modal-title"></h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+  <script src="app.js"></script>
+</body>
+</html>

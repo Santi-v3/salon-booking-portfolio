@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Friseur Terminverwaltung</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">&#9986;</div>
+      <h1>Friseur</h1>
+    </div>
+    <nav>
+      <button class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+        <span class="nav-icon">&#9632;</span>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="calendar" onclick="navigate('calendar')">
+        <span class="nav-icon">&#128197;</span>
+        <span>Kalender</span>
+      </button>
+      <button class="nav-item" data-page="customers" onclick="navigate('customers')">
+        <span class="nav-icon">&#128101;</span>
+        <span>Kunden</span>
+      </button>
+      <button class="nav-item" data-page="services" onclick="navigate('services')">
+        <span class="nav-icon">&#128296;</span>
+        <span>Services</span>
+      </button>
+      <button class="nav-item" data-page="statistics" onclick="navigate('statistics')">
+        <span class="nav-icon">&#128200;</span>
+        <span>Statistiken</span>
+      </button>
+      <button class="nav-item" data-page="settings" onclick="navigate('settings')">
+        <span class="nav-icon">&#9881;</span>
+        <span>Einstellungen</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer" id="sidebar-footer">
+      <div class="server-info">Server: <span id="server-status">offline</span></div>
+      <button class="copy-btn" onclick="copyBookingUrl()">&#128203; Buchungs-Link kopieren</button>
+    </div>
+  </div>
+
+  <div id="main-content">
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <h2>Dashboard</h2>
+        <div class="header-actions">
+          <input type="date" id="dash-date" onchange="loadDashboard()">
+          <button class="btn btn-primary" onclick="openNewAppointment()">+ Neuer Termin</button>
+        </div>
+      </div>
+      <div class="stats-grid" id="dash-stats"></div>
+      <div class="card">
+        <div class="card-header"><h3>Heutige Termine</h3></div>
+        <div class="card-body" id="dash-appointments"></div>
+      </div>
+    </div>
+
+    <div id="page-calendar" class="page">
+      <div class="page-header">
+        <h2>Kalender</h2>
+        <div class="header-actions">
+          <button class="btn" onclick="changeWeek(-1)">&larr; Vorwoche</button>
+          <span id="week-label" style="font-weight:600;min-width:200px;text-align:center;"></span>
+          <button class="btn" onclick="changeWeek(1)">N&auml;chste Woche &rarr;</button>
+          <button class="btn btn-primary" onclick="openNewAppointment()">+ Neuer Termin</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" id="calendar-view"></div>
+      </div>
+    </div>
+
+    <div id="page-customers" class="page">
+      <div class="page-header">
+        <h2>Kunden</h2>
+        <div class="header-actions">
+          <input type="text" id="customer-search" placeholder="Suchen..." oninput="loadCustomers()">
+          <button class="btn btn-primary" onclick="openNewCustomer()">+ Neuer Kunde</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" id="customer-list"></div>
+      </div>
+    </div>
+
+    <div id="page-services" class="page">
+      <div class="page-header">
+        <h2>Dienstleistungen</h2>
+        <button class="btn btn-primary" onclick="openNewService()">+ Neue Dienstleistung</button>
+      </div>
+      <div class="card">
+        <div class="card-body" id="service-list"></div>
+      </div>
+    </div>
+
+    <div id="page-statistics" class="page">
+      <div class="page-header">
+        <h2>Statistiken</h2>
+        <div class="header-actions">
+          <input type="date" id="stats-start" onchange="loadStatistics()">
+          <span>bis</span>
+          <input type="date" id="stats-end" onchange="loadStatistics()">
+        </div>
+      </div>
+      <div class="stats-grid" id="stats-cards"></div>
+      <div class="card">
+        <div class="card-header"><h3>Nach Dienstleistung</h3></div>
+        <div class="card-body" id="stats-by-service"></div>
+      </div>
+    </div>
+
+    <div id="page-settings" class="page">
+      <div class="page-header"><h2>Einstellungen</h2></div>
+      <div class="settings-grid">
+        <div class="card">
+          <div class="card-header"><h3>Salon</h3></div>
+          <div class="card-body">
+            <label>Name: <input type="text" id="set-shop_name" onchange="saveSetting('shop_name', this.value)"></label>
+            <label>Adresse: <input type="text" id="set-shop_address" onchange="saveSetting('shop_address', this.value)"></label>
+            <label>Vorlaufzeit (Min.): <input type="number" id="set-booking_lead_time" onchange="saveSetting('booking_lead_time', this.value)"></label>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>E-Mail (SMTP)</h3></div>
+          <div class="card-body">
+            <label>Host: <input type="text" id="set-smpt_host" onchange="saveSetting('smpt_host', this.value)"></label>
+            <label>Port: <input type="number" id="set-smpt_port" onchange="saveSetting('smpt_port', this.value)"></label>
+            <label>Benutzer: <input type="text" id="set-smpt_user" onchange="saveSetting('smpt_user', this.value)"></label>
+            <label>Passwort: <input type="password" id="set-smpt_pass" onchange="saveSetting('smpt_pass', this.value)"></label>
+            <label>Absender: <input type="email" id="set-smpt_from" onchange="saveSetting('smpt_from', this.value)"></label>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>&Ouml;ffnungszeiten</h3></div>
+          <div class="card-body" id="working-hours-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Geschlossen / Feiertage</h3></div>
+          <div class="card-body">
+            <div class="add-blocked-row">
+              <input type="date" id="blocked-date-input">
+              <input type="text" id="blocked-reason-input" placeholder="Grund">
+              <button class="btn btn-sm" onclick="addBlockedDate()">Hinzuf&uuml;gen</button>
+            </div>
+            <div id="blocked-dates-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-overlay" class="hidden" onclick="closeModal(event)">
+    <div id="modal-content" class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modal-title"></h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

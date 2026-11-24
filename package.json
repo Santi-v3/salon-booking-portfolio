@@ -1,0 +1,22 @@
+{
+  "name": "salon-booking-system",
+  "version": "0.1.0",
+  "description": "Portfolio prototype for salon appointment booking and desktop administration",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "ELECTRON_DEV=true electron .",
+    "start:server": "node start.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.22.3",
+    "express-session": "^1.19.0",
+    "resend": "^6.39.0"
+  },
+  "devDependencies": {
+    "electron": "^45.5.0"
+  }
+}
